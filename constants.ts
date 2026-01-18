@@ -1,0 +1,65 @@
+import { Material } from './types';
+
+// Replace this with your deployed Google Apps Script Web App URL
+export const API_URL = '';
+
+export const INITIAL_MATERIALS: Material[] = [
+  {
+    id: '2',
+    rowIndex: 2,
+    category: '辦公用品',
+    group: '行政組',
+    name: 'A4 白紙',
+    description: '列印講義用',
+    source: '庫存',
+    loc: '營本部箱 A',
+    owned: 2,
+    need: 2,
+    lack: 0,
+    unitPrice: 150,
+    totalEst: 0,
+    responsible: '王小明',
+    actualPrice: 0,
+    actualQty: 2,
+    actualTotal: 0,
+    actualItem: '',
+    receiptPhoto: '',
+    status: '庫存',
+    packed: true,
+    counted: true,
+    countPhoto: '',
+    note: '',
+    remaining: 0,
+    refill: '否',
+    suggestion: ''
+  },
+  {
+    id: '3',
+    rowIndex: 3,
+    category: '活動道具',
+    group: '活動組',
+    name: '水球',
+    description: '大地遊戲使用',
+    source: '採買',
+    loc: '未定',
+    owned: 0,
+    need: 10,
+    lack: 10,
+    unitPrice: 50,
+    totalEst: 500,
+    responsible: '陳大文',
+    actualPrice: 0,
+    actualQty: 0,
+    actualTotal: 0,
+    actualItem: '',
+    receiptPhoto: '',
+    status: '待買',
+    packed: false,
+    counted: false,
+    countPhoto: '',
+    note: '記得買充氣筒',
+    remaining: 0,
+    refill: '是',
+    suggestion: ''
+  }
+];

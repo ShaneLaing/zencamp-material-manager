@@ -1,0 +1,7 @@
+{
+  "name": "ZenCamp Material Manager",
+  "description": "A comprehensive material management system for the 10th Leadership Zen Camp, featuring real-time tracking, procurement management, and packing checklists.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
