@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Material, ViewMode, Stats, User, UserRole } from './types';
+import { Material, ViewMode, Stats, User, UserRole, OverviewGroupBy } from './types';
 import { 
   fetchMaterials, 
   updateMaterial, 
@@ -25,6 +25,8 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [isGoogleSignedIn, setIsGoogleSignedIn] = useState(false);
+  const [overviewGroupBy, setOverviewGroupBy] = useState<OverviewGroupBy>('none');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   
   // Sync Status
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
@@ -96,6 +98,18 @@ const App: React.FC = () => {
     await forceSync();
   };
 
+  const handleOverviewGroupByChange = (value: OverviewGroupBy) => {
+    setOverviewGroupBy(value);
+    setCollapsedGroups({});
+  };
+
+  const handleToggleGroup = (groupKey: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
+
   // Handle User Switching
   const handleSwitchUser = (role: UserRole) => {
     let name = 'User';
@@ -151,6 +165,30 @@ const App: React.FC = () => {
         m.group.toLowerCase().includes(q) || 
         m.responsible.toLowerCase().includes(q)
       );
+    }
+
+    // 3. Overview Sorting Priority
+    if (viewMode === ViewMode.OVERVIEW) {
+      const getKey = (value: string | number | undefined | null) => String(value ?? '').trim();
+      result = [...result].sort((a, b) => {
+        const aCategory = getKey(a.category);
+        const bCategory = getKey(b.category);
+        if (aCategory !== bCategory) return aCategory.localeCompare(bCategory, 'zh-Hant');
+
+        const aGroup = getKey(a.group);
+        const bGroup = getKey(b.group);
+        if (aGroup !== bGroup) return aGroup.localeCompare(bGroup, 'zh-Hant');
+
+        const aSource = getKey(a.source);
+        const bSource = getKey(b.source);
+        if (aSource !== bSource) return aSource.localeCompare(bSource, 'zh-Hant');
+
+        const aResponsible = getKey(a.responsible);
+        const bResponsible = getKey(b.responsible);
+        if (aResponsible !== bResponsible) return aResponsible.localeCompare(bResponsible, 'zh-Hant');
+
+        return 0;
+      });
     }
 
     return result;
@@ -335,6 +373,27 @@ const App: React.FC = () => {
                 {getPageTitle(viewMode)}
             </h2>
 
+            {/* Overview Group By */}
+            {[ViewMode.OVERVIEW, ViewMode.STOCK, ViewMode.PROCUREMENT, ViewMode.BORROWING].includes(viewMode) && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-slate-600">分組</span>
+                <select
+                  value={overviewGroupBy}
+                  onChange={(e) => handleOverviewGroupByChange(e.target.value as OverviewGroupBy)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="none">不分組</option>
+                  <option value="category">用途分類</option>
+                  <option value="group">組別</option>
+                  <option value="source">來源</option>
+                  <option value="responsible">負責人</option>
+                </select>
+                {overviewGroupBy !== 'none' && (
+                  <span className="text-xs text-slate-400">點擊分組標題可收起/展開</span>
+                )}
+              </div>
+            )}
+
             {/* List */}
             {loading ? (
                 <div className="flex justify-center items-center h-64 text-slate-500">
@@ -347,6 +406,9 @@ const App: React.FC = () => {
                       viewMode={viewMode}
                       onUpdate={handleUpdateMaterial}
                       currentUser={currentUser}
+                      groupBy={[ViewMode.OVERVIEW, ViewMode.STOCK, ViewMode.PROCUREMENT, ViewMode.BORROWING].includes(viewMode) ? overviewGroupBy : 'none'}
+                      collapsedGroups={[ViewMode.OVERVIEW, ViewMode.STOCK, ViewMode.PROCUREMENT, ViewMode.BORROWING].includes(viewMode) ? collapsedGroups : {}}
+                      onToggleGroup={[ViewMode.OVERVIEW, ViewMode.STOCK, ViewMode.PROCUREMENT, ViewMode.BORROWING].includes(viewMode) ? handleToggleGroup : undefined}
                      />
                    {filteredMaterials.length === 0 && (
                        <div className="text-center py-12 text-slate-400">

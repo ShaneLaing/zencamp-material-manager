@@ -73,3 +73,5 @@ export interface Stats {
 }
 
 export type MaterialUpdate = Partial<Material>;
+
+export type OverviewGroupBy = 'none' | 'category' | 'group' | 'source' | 'responsible';

@@ -1,15 +1,26 @@
 import React from 'react';
-import { Material, ViewMode, UserRole, User } from '../types';
-import { Camera } from 'lucide-react';
+import { Material, ViewMode, UserRole, User, OverviewGroupBy } from '../types';
+import { Camera, ChevronDown } from 'lucide-react';
 
 interface MaterialTableProps {
   materials: Material[];
   viewMode: ViewMode;
   onUpdate: (id: string, updates: Partial<Material>) => void;
   currentUser: User;
+  groupBy?: OverviewGroupBy;
+  collapsedGroups?: Record<string, boolean>;
+  onToggleGroup?: (groupKey: string) => void;
 }
 
-const MaterialTable: React.FC<MaterialTableProps> = ({ materials, viewMode, onUpdate, currentUser }) => {
+const MaterialTable: React.FC<MaterialTableProps> = ({
+  materials,
+  viewMode,
+  onUpdate,
+  currentUser,
+  groupBy = 'none',
+  collapsedGroups = {},
+  onToggleGroup
+}) => {
   // Permission Logic
   const canEdit = (): boolean => {
     if (currentUser.role === UserRole.ADMIN) return true;
@@ -40,37 +51,55 @@ const MaterialTable: React.FC<MaterialTableProps> = ({ materials, viewMode, onUp
     return 'bg-slate-100 text-slate-700 border-slate-200';
   };
 
+  const getColumnCount = () => {
+    switch (viewMode) {
+      case ViewMode.STOCK:
+        return 4;
+      case ViewMode.PROCUREMENT:
+        return 6;
+      case ViewMode.BORROWING:
+        return 6;
+      case ViewMode.ESTIMATION:
+        return 7;
+      case ViewMode.ACTUAL_PURCHASE:
+        return 9;
+      case ViewMode.CHECKLIST:
+        return 8;
+      case ViewMode.SETTLEMENT:
+        return 8;
+      case ViewMode.OVERVIEW:
+      default:
+        return 6;
+    }
+  };
+
   const renderHeader = () => {
     switch (viewMode) {
       case ViewMode.STOCK:
         return (
           <tr>
+            <th className="px-3 py-2 text-left">用途分類</th>
             <th className="px-3 py-2 text-left">組別</th>
-            <th className="px-3 py-2 text-left">狀態</th>
             <th className="px-3 py-2 text-left">品項</th>
             <th className="px-3 py-2 text-left">用途</th>
-            <th className="px-3 py-2 text-left">負責人</th>
-            <th className="px-3 py-2 text-left">位置</th>
-            <th className="px-3 py-2 text-right">擁有數量</th>
           </tr>
         );
       case ViewMode.PROCUREMENT:
         return (
           <tr>
+            <th className="px-3 py-2 text-left">用途分類</th>
             <th className="px-3 py-2 text-left">組別</th>
-            <th className="px-3 py-2 text-left">狀態</th>
             <th className="px-3 py-2 text-left">品項</th>
             <th className="px-3 py-2 text-left">用途</th>
             <th className="px-3 py-2 text-left">負責人</th>
-            <th className="px-3 py-2 text-left">來源</th>
             <th className="px-3 py-2 text-right">缺額 / 需求</th>
           </tr>
         );
       case ViewMode.BORROWING:
         return (
           <tr>
+            <th className="px-3 py-2 text-left">用途分類</th>
             <th className="px-3 py-2 text-left">組別</th>
-            <th className="px-3 py-2 text-left">狀態</th>
             <th className="px-3 py-2 text-left">品項</th>
             <th className="px-3 py-2 text-left">用途</th>
             <th className="px-3 py-2 text-left">借用對象</th>
@@ -133,11 +162,12 @@ const MaterialTable: React.FC<MaterialTableProps> = ({ materials, viewMode, onUp
       default:
         return (
           <tr>
+            <th className="px-3 py-2 text-left">用途分類</th>
             <th className="px-3 py-2 text-left">組別</th>
-            <th className="px-3 py-2 text-left">狀態</th>
             <th className="px-3 py-2 text-left">品項</th>
-            <th className="px-3 py-2 text-left">用途</th>
+            <th className="px-3 py-2 text-left">來源</th>
             <th className="px-3 py-2 text-left">負責人</th>
+            <th className="px-3 py-2 text-left">用途</th>
           </tr>
         );
     }
@@ -148,32 +178,20 @@ const MaterialTable: React.FC<MaterialTableProps> = ({ materials, viewMode, onUp
       case ViewMode.STOCK:
         return (
           <tr key={material.id} className="border-b border-slate-100">
+            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
             <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
-            <td className="px-3 py-2">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded border ${getStatusColor(material.status)}`}>
-                {material.status || '未定'}
-              </span>
-            </td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible}</td>
-            <td className="px-3 py-2 text-sm text-indigo-600">{material.loc || '未分配'}</td>
-            <td className="px-3 py-2 text-right text-sm font-semibold text-slate-800">{material.owned || 0}</td>
           </tr>
         );
       case ViewMode.PROCUREMENT:
         return (
           <tr key={material.id} className="border-b border-slate-100">
+            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
             <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
-            <td className="px-3 py-2">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded border ${getStatusColor(material.status)}`}>
-                {material.status || '未定'}
-              </span>
-            </td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible}</td>
-            <td className="px-3 py-2 text-sm text-slate-700">{material.source}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible || '未指定'}</td>
             <td className="px-3 py-2 text-right text-sm font-semibold text-orange-600">
               {material.lack} <span className="text-slate-400">/ {material.need}</span>
             </td>
@@ -182,15 +200,11 @@ const MaterialTable: React.FC<MaterialTableProps> = ({ materials, viewMode, onUp
       case ViewMode.BORROWING:
         return (
           <tr key={material.id} className="border-b border-slate-100">
+            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
             <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
-            <td className="px-3 py-2">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded border ${getStatusColor(material.status)}`}>
-                {material.status || '未定'}
-              </span>
-            </td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible || '未指定'}</td>
             <td className="px-3 py-2">
               <input
                 type="text"
@@ -386,19 +400,46 @@ const MaterialTable: React.FC<MaterialTableProps> = ({ materials, viewMode, onUp
       default:
         return (
           <tr key={material.id} className="border-b border-slate-100">
+            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
             <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
-            <td className="px-3 py-2">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded border ${getStatusColor(material.status)}`}>
-                {material.status || '未定'}
-              </span>
-            </td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{material.source || '未指定'}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible || '未指定'}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible}</td>
           </tr>
         );
     }
   };
+
+  const groupByLabelMap: Record<Exclude<OverviewGroupBy, 'none'>, string> = {
+    category: '用途分類',
+    group: '組別',
+    source: '來源',
+    responsible: '負責人'
+  };
+
+  const groupByFieldMap: Record<Exclude<OverviewGroupBy, 'none'>, keyof Material> = {
+    category: 'category',
+    group: 'group',
+    source: 'source',
+    responsible: 'responsible'
+  };
+
+  const shouldGroup = [ViewMode.OVERVIEW, ViewMode.STOCK, ViewMode.PROCUREMENT, ViewMode.BORROWING]
+    .includes(viewMode) && groupBy !== 'none';
+  const groupedMaterials = shouldGroup ? new Map<string, Material[]>() : null;
+
+  if (shouldGroup && groupedMaterials) {
+    const field = groupByFieldMap[groupBy as Exclude<OverviewGroupBy, 'none'>];
+    materials.forEach((material) => {
+      const rawValue = String(material[field] || '').trim();
+      const key = rawValue || '未分類';
+      if (!groupedMaterials.has(key)) groupedMaterials.set(key, []);
+      groupedMaterials.get(key)?.push(material);
+    });
+  }
+
+  const columnCount = getColumnCount();
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
@@ -408,7 +449,35 @@ const MaterialTable: React.FC<MaterialTableProps> = ({ materials, viewMode, onUp
             {renderHeader()}
           </thead>
           <tbody>
-            {materials.map(renderRow)}
+            {shouldGroup && groupedMaterials ? (
+              Array.from(groupedMaterials.entries()).map(([groupKey, items]) => {
+                const isCollapsed = !!collapsedGroups[groupKey];
+                const label = groupByLabelMap[groupBy as Exclude<OverviewGroupBy, 'none'>];
+                return (
+                  <React.Fragment key={groupKey}>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <td colSpan={columnCount} className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => onToggleGroup?.(groupKey)}
+                          className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900"
+                        >
+                          <ChevronDown
+                            size={16}
+                            className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          />
+                          <span>{label}：{groupKey}</span>
+                          <span className="text-xs text-slate-400">({items.length})</span>
+                        </button>
+                      </td>
+                    </tr>
+                    {!isCollapsed && items.map(renderRow)}
+                  </React.Fragment>
+                );
+              })
+            ) : (
+              materials.map(renderRow)
+            )}
           </tbody>
         </table>
       </div>

@@ -197,19 +197,53 @@ class SyncManager {
 
   private async sync(): Promise<boolean> {
     if (this.isSyncing || !this.appsScriptUrl) return false;
+    if (this.changeQueue.length === 0) {
+      // No pending changes, just pull latest
+      this.isSyncing = true;
+      this.lastError = null;
+      this.notifyStatus();
+      try {
+        await this.pull();
+        this.lastSyncTime = Date.now();
+        this.isSyncing = false;
+        this.notifyStatus();
+        return true;
+      } catch (error: any) {
+        console.error('Pull failed:', error);
+        this.lastError = error.message || 'Pull failed';
+        this.isSyncing = false;
+        this.notifyStatus();
+        return false;
+      }
+    }
 
     this.isSyncing = true;
     this.lastError = null;
     this.notifyStatus();
 
     try {
-      // Step 1: Push local changes if any
-      if (this.changeQueue.length > 0) {
-        await this.push();
-      }
+      // === Fetch-Merge-Push Strategy ===
+      // Step 1: Fetch latest cloud data
+      const cloudData = await this.fetchCloudData();
 
-      // Step 2: Pull latest data from server
-      await this.pull();
+      // Step 2: Apply pending local changes onto cloud data
+      const mergedData = this.applyLocalChangesToCloud(cloudData);
+
+      // Step 3: Push merged data back to cloud via batch update
+      await this.pushMergedChanges();
+
+      // Step 4: Update local state with merged data
+      this.serverData = mergedData;
+      this.localData = mergedData;
+      localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(this.localData));
+
+      // Step 5: Clear the queue after successful sync
+      this.clearQueue();
+
+      // Notify UI
+      if (this.onDataUpdate) {
+        this.onDataUpdate([...this.localData]);
+      }
 
       this.lastSyncTime = Date.now();
       this.isSyncing = false;
@@ -225,75 +259,33 @@ class SyncManager {
     }
   }
 
-  private async push(): Promise<void> {
-    if (!this.appsScriptUrl || this.changeQueue.length === 0) return;
-
-    // Prepare batch update payload
-    const updates = this.changeQueue.map(c => ({
-      rowIndex: c.rowIndex,
-      field: c.field,
-      value: c.value
-    }));
-
-    const response = await fetch(this.appsScriptUrl, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-      body: JSON.stringify({
-        action: 'batch_update',
-        updates
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Push failed: HTTP ${response.status}`);
-    }
-
-    const result = await response.json();
-    if (result.status === 'error') {
-      throw new Error(result.message || 'Push failed');
-    }
-
-    // Clear the queue after successful push
-    this.clearQueue();
-  }
-
-  private async pull(): Promise<void> {
-    if (!this.appsScriptUrl) {
-      // No API configured, load from cache
-      const stored = localStorage.getItem(STORAGE_KEY_DATA);
-      if (stored) {
-        this.localData = JSON.parse(stored);
-        this.serverData = [...this.localData];
-      }
-      return;
-    }
+  /**
+   * Fetch cloud data without modifying local state
+   */
+  private async fetchCloudData(): Promise<Material[]> {
+    if (!this.appsScriptUrl) return [];
 
     const response = await fetch(this.appsScriptUrl, {
       method: 'GET',
-      mode: 'cors',
+      redirect: 'follow',
     });
 
     if (!response.ok) {
-      throw new Error(`Pull failed: HTTP ${response.status}`);
+      throw new Error(`Fetch cloud failed: HTTP ${response.status}`);
     }
 
     const rawData = await response.json();
     
-    // Parse response
     let items: any[] = [];
     if (Array.isArray(rawData)) {
       items = rawData;
     } else if (rawData.status === 'error') {
-      throw new Error(rawData.message || 'Pull failed');
+      throw new Error(rawData.message || 'Fetch cloud failed');
     } else {
       items = rawData.data || rawData;
     }
 
-    // Transform to Material type
-    const newServerData: Material[] = items.map((item: any) => ({
+    return items.map((item: any) => ({
       id: String(item.rowIndex || ''),
       rowIndex: item.rowIndex,
       category: String(item.category || ''),
@@ -322,26 +314,12 @@ class SyncManager {
       refill: String(item.refill || ''),
       suggestion: String(item.suggestion || ''),
     }));
-
-    // Merge with local changes (Local-First strategy)
-    this.serverData = newServerData;
-    this.localData = this.mergeData(newServerData);
-
-    // Save merged data to cache
-    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(this.localData));
-
-    // Notify UI
-    if (this.onDataUpdate) {
-      this.onDataUpdate([...this.localData]);
-    }
   }
 
   /**
-   * Merge server data with pending local changes
-   * Local changes take priority (Local-First)
+   * Apply pending local changes onto cloud data
    */
-  private mergeData(serverData: Material[]): Material[] {
-    // Create a map of pending changes by id
+  private applyLocalChangesToCloud(cloudData: Material[]): Material[] {
     const pendingChanges = new Map<string, Map<string, any>>();
     
     for (const change of this.changeQueue) {
@@ -351,12 +329,10 @@ class SyncManager {
       pendingChanges.get(change.id)!.set(change.field, change.value);
     }
 
-    // Apply pending changes over server data
-    return serverData.map(item => {
+    return cloudData.map(item => {
       const changes = pendingChanges.get(item.id);
       if (!changes) return item;
 
-      // Apply each pending change to this item
       const merged = { ...item };
       changes.forEach((value, field) => {
         (merged as any)[field] = value;
@@ -364,6 +340,66 @@ class SyncManager {
 
       return merged;
     });
+  }
+
+  /**
+   * Push local changes to cloud (batch update)
+   */
+  private async pushMergedChanges(): Promise<void> {
+    if (!this.appsScriptUrl || this.changeQueue.length === 0) return;
+
+    const updates = this.changeQueue.map(c => ({
+      rowIndex: c.rowIndex,
+      field: c.field,
+      value: c.value
+    }));
+
+    const response = await fetch(this.appsScriptUrl, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: JSON.stringify({
+        action: 'batch_update',
+        updates
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Push failed: HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.status === 'error') {
+      throw new Error(result.message || 'Push failed');
+    }
+  }
+
+  private async pull(): Promise<void> {
+    if (!this.appsScriptUrl) {
+      // No API configured, load from cache
+      const stored = localStorage.getItem(STORAGE_KEY_DATA);
+      if (stored) {
+        this.localData = JSON.parse(stored);
+        this.serverData = [...this.localData];
+      }
+      return;
+    }
+
+    // Pull uses fetchCloudData then merges with pending changes
+    const cloudData = await this.fetchCloudData();
+    
+    this.serverData = cloudData;
+    this.localData = this.applyLocalChangesToCloud(cloudData);
+
+    // Save merged data to cache
+    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(this.localData));
+
+    // Notify UI
+    if (this.onDataUpdate) {
+      this.onDataUpdate([...this.localData]);
+    }
   }
 
   // --- Exit Guard ---

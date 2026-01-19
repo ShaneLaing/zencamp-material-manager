@@ -54,11 +54,23 @@ function handleRequest(e, method) {
     } 
     
     if (method === 'post') {
-      const content = e.postData ? e.postData.contents : "{}";
+      let content = "{}";
+      
+      // 處理 POST 資料的不同來源
+      if (e && e.postData) {
+        content = e.postData.contents || "{}";
+      } else if (e && e.parameter && e.parameter.data) {
+        content = e.parameter.data;
+      }
+      
+      console.log("POST content received:", content);
+      
       const payload = JSON.parse(content);
+      console.log("Parsed payload:", JSON.stringify(payload));
 
       // 支援批次更新 (Batch Update)
       if (payload.action === "batch_update") {
+        console.log("Processing batch_update with", payload.updates ? payload.updates.length : 0, "items");
         const result = batchUpdateRows(sheet, payload.updates);
         return createJSON({ status: "success", message: "Batch updated", count: result });
       }
@@ -68,10 +80,11 @@ function handleRequest(e, method) {
         const result = updateRow(sheet, payload.data);
         return createJSON({ status: "success", message: "Updated", debug: result });
       }
-      return createJSON({ status: "error", message: "Unknown action" });
+      return createJSON({ status: "error", message: "Unknown action: " + payload.action });
     }
 
   } catch (error) {
+    console.error("Request error:", error.toString(), error.stack);
     return createJSON({ status: "error", message: error.toString(), stack: error.stack });
   } finally {
     lock.releaseLock();
@@ -229,6 +242,12 @@ function batchUpdateRows(sheet, updates) {
 function createJSON(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// 處理 CORS preflight 請求 (OPTIONS)
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
 // ★★★ 測試專用函數 ★★★
