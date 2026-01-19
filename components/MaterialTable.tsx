@@ -21,6 +21,63 @@ const MaterialTable: React.FC<MaterialTableProps> = ({
   collapsedGroups = {},
   onToggleGroup
 }) => {
+  const tagPalettes: Record<'category' | 'group' | 'source' | 'responsible', string[]> = {
+    category: [
+      'bg-indigo-50 text-indigo-700 border-indigo-200',
+      'bg-emerald-50 text-emerald-700 border-emerald-200',
+      'bg-amber-50 text-amber-700 border-amber-200',
+      'bg-sky-50 text-sky-700 border-sky-200',
+      'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+      'bg-rose-50 text-rose-700 border-rose-200',
+      'bg-lime-50 text-lime-700 border-lime-200',
+      'bg-teal-50 text-teal-700 border-teal-200'
+    ],
+    group: [
+      'bg-violet-50 text-violet-700 border-violet-200',
+      'bg-cyan-50 text-cyan-700 border-cyan-200',
+      'bg-orange-50 text-orange-700 border-orange-200',
+      'bg-blue-50 text-blue-700 border-blue-200',
+      'bg-pink-50 text-pink-700 border-pink-200',
+      'bg-emerald-50 text-emerald-700 border-emerald-200'
+    ],
+    source: [
+      'bg-slate-50 text-slate-700 border-slate-200',
+      'bg-green-50 text-green-700 border-green-200',
+      'bg-yellow-50 text-yellow-700 border-yellow-200',
+      'bg-indigo-50 text-indigo-700 border-indigo-200',
+      'bg-red-50 text-red-700 border-red-200'
+    ],
+    responsible: [
+      'bg-blue-50 text-blue-700 border-blue-200',
+      'bg-amber-50 text-amber-700 border-amber-200',
+      'bg-emerald-50 text-emerald-700 border-emerald-200',
+      'bg-violet-50 text-violet-700 border-violet-200',
+      'bg-rose-50 text-rose-700 border-rose-200',
+      'bg-teal-50 text-teal-700 border-teal-200',
+      'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+      'bg-sky-50 text-sky-700 border-sky-200'
+    ]
+  };
+
+  const getTagClass = (value: string, type: keyof typeof tagPalettes) => {
+    const safeValue = value || '未指定';
+    let hash = 0;
+    for (let i = 0; i < safeValue.length; i++) {
+      hash = (hash * 31 + safeValue.charCodeAt(i)) >>> 0;
+    }
+    const palette = tagPalettes[type];
+    return palette[hash % palette.length];
+  };
+
+  const renderTag = (value: string, type: keyof typeof tagPalettes) => {
+    const label = value || (type === 'category' ? '未分類' : '未指定');
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getTagClass(label, type)}`}>
+        {label}
+      </span>
+    );
+  };
+
   // Permission Logic
   const canEdit = (): boolean => {
     if (currentUser.role === UserRole.ADMIN) return true;
@@ -178,8 +235,8 @@ const MaterialTable: React.FC<MaterialTableProps> = ({
       case ViewMode.STOCK:
         return (
           <tr key={material.id} className="border-b border-slate-100">
-            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
-            <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.category, 'category')}</td>
+            <td className="px-3 py-2 text-sm text-slate-700">{renderTag(material.group, 'group')}</td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
           </tr>
@@ -187,11 +244,11 @@ const MaterialTable: React.FC<MaterialTableProps> = ({
       case ViewMode.PROCUREMENT:
         return (
           <tr key={material.id} className="border-b border-slate-100">
-            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
-            <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.category, 'category')}</td>
+            <td className="px-3 py-2 text-sm text-slate-700">{renderTag(material.group, 'group')}</td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible || '未指定'}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.responsible, 'responsible')}</td>
             <td className="px-3 py-2 text-right text-sm font-semibold text-orange-600">
               {material.lack} <span className="text-slate-400">/ {material.need}</span>
             </td>
@@ -200,11 +257,11 @@ const MaterialTable: React.FC<MaterialTableProps> = ({
       case ViewMode.BORROWING:
         return (
           <tr key={material.id} className="border-b border-slate-100">
-            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
-            <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.category, 'category')}</td>
+            <td className="px-3 py-2 text-sm text-slate-700">{renderTag(material.group, 'group')}</td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible || '未指定'}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.responsible, 'responsible')}</td>
             <td className="px-3 py-2">
               <input
                 type="text"
@@ -400,11 +457,11 @@ const MaterialTable: React.FC<MaterialTableProps> = ({
       default:
         return (
           <tr key={material.id} className="border-b border-slate-100">
-            <td className="px-3 py-2 text-sm text-slate-600">{material.category || '未分類'}</td>
-            <td className="px-3 py-2 text-sm text-slate-700">{material.group}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.category, 'category')}</td>
+            <td className="px-3 py-2 text-sm text-slate-700">{renderTag(material.group, 'group')}</td>
             <td className="px-3 py-2 text-sm font-medium text-slate-800">{material.name}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.source || '未指定'}</td>
-            <td className="px-3 py-2 text-sm text-slate-600">{material.responsible || '未指定'}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.source, 'source')}</td>
+            <td className="px-3 py-2 text-sm text-slate-600">{renderTag(material.responsible, 'responsible')}</td>
             <td className="px-3 py-2 text-sm text-slate-500">{material.description || '無用途說明'}</td>
           </tr>
         );
